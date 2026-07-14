@@ -6,7 +6,7 @@ Commands use Bash syntax and placeholders such as `$RESOURCE_GROUP`; set them in
 
 ```bash
 python3.12 -m venv .venv
-.venv/bin/python -m pip install -e '.[dev]'
+.venv/bin/python -m pip install -e '.[all]'
 .venv/bin/python -m ruff check src tests scripts functions feature_store azureml/scoring
 .venv/bin/python -m pytest -q
 .venv/bin/python -m azureml_snowflake_poc.demo \

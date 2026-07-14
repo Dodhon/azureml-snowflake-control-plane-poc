@@ -75,7 +75,7 @@ Requires Python 3.12. No Azure or Snowflake credentials are needed.
 
 ```bash
 python3.12 -m venv .venv
-.venv/bin/python -m pip install -e '.[dev]'
+.venv/bin/python -m pip install -e '.[all]'
 .venv/bin/python -m pytest -q
 .venv/bin/python -m azureml_snowflake_poc.demo --scenario all --output .validation/demo.json
 .venv/bin/aml-poc-validate
