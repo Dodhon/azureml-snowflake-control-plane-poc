@@ -330,8 +330,35 @@ Implement the direct-pull AML-centered hybrid with explicit Snowflake boundaries
 - [x] Architecture evidence and current official sources are linked.
 - [x] Exact validation and publication rollback are defined.
 - [x] Most-likely-wrong cloud claim is explicit and is not used as completion evidence.
-- [ ] Closeout record includes delivered-vs-planned reconciliation, validation, review verdict, residual risks, and public delivery references.
+- [x] Closeout record includes delivered-vs-planned reconciliation, validation, review verdict, residual risks, and public delivery references.
 
 ## Closeout Record
 
-Pending implementation and validation.
+**Status:** Delivered and published on 2026-07-14.
+
+**Delivered versus planned:** R1-R16 are present: Snowflake pull/publish boundaries, exact-quantity contracts, AML components and lifecycle pipeline, MLflow/model promotion, managed Feature Store activation assets, batch deployment, model monitoring, Event Grid/Function reaction flow, managed identities/RBAC, Bicep, local fixtures, CI, operator runbooks, rollback procedures, and a source-indexed maturity roadmap. The direct-pull AML-centered architecture remains unchanged. The final hardening pass added cross-run promotion serialization, complete scoring identities, least-privilege Snowflake grants, credential-free monitor rendering, exact rollback commands, and stronger repository validation.
+
+**Old-contract reconciliation:** Snowflake remains authoritative for source features, delayed actuals, and the single product-facing `PREDICTIONS` table. Exact-quantity mapping/version invariants remain explicit. AML remains authoritative for training, registry, deployment, orchestration, monitoring, and event reactions. Event Grid remains asynchronous evidence/reaction transport rather than workflow state.
+
+**Validation evidence:**
+
+- `python -m pytest -q`: 37 passed.
+- Ruff lint and format checks, `compileall`, repository contract/public-safety validation, and `git diff --check`: passed.
+- The pinned Azure ML SDK loaded all seven components, the lifecycle pipeline, runtime environment, Feature Store definitions, and rendered monitor schedule.
+- Both Bicep templates compiled; the Python wheel and Azure Function ZIP packaged.
+- All five local lifecycle scenarios passed twice with byte-identical artifacts.
+- A clean clone installed `.[all]`, then passed tests, Ruff, SDK asset loading, repository validation, and the five-scenario demo.
+- The staged secret-signature scan and repository forbidden-pattern scan returned no findings.
+- GitHub Actions passed `bicep` in 28 seconds and `python-and-contracts` in 1 minute 28 seconds on PR #1.
+
+**Review verdict:** `PASS_WITH_CAVEATS`. Two independent adversarial repair reviews rechecked runtime/data flow, security/RBAC, concurrency, monitoring, rollback, documentation, and evidence claims. Both reported no remaining P0-P2 findings after repairs. LSP was unavailable; symbol/reference coverage used repository search, imports/call sites, compiler/SDK loading, contract validation, and behavior tests.
+
+**Residual risks:** Live Azure and Snowflake execution was intentionally not performed. Tenant capability/quota checks, Bicep `what-if`, managed-identity propagation, Snowflake External OAuth, Feature Store materialization, AML job submission, endpoint invocation, Event Grid delivery/dead-letter behavior, model-monitor execution, and transactional Snowflake publication remain unverified until a funded target subscription/account is supplied. The pinned SDK emits experimental/deprecation warnings while loading monitoring schemas. Level 3/4 maturity surfaces remain activation templates, not production-readiness claims.
+
+**Public delivery:**
+
+- Repository: https://github.com/Dodhon/azureml-snowflake-control-plane-poc
+- Reviewed PR: https://github.com/Dodhon/azureml-snowflake-control-plane-poc/pull/1
+- Merge commit: `4198edac485293b808e80123f5cf87d00cd54906`
+
+**Rollback:** Revert merge commit `4198edac485293b808e80123f5cf87d00cd54906`, or make/delete the isolated public repository. No cloud or Snowflake resources were created or modified.
