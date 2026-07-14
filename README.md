@@ -45,6 +45,7 @@ AML jobs/assets/tags + monitor runs + Event Grid delivery + App Insights + dead 
 | Labels | Scoring rows cannot contain target/actual columns. |
 | Point-in-time join | A label only sees the latest feature row at or before label time and inside the configured tolerance. |
 | Promotion | One absent, invalid, or failed metric rule prevents promotion. |
+| Promotion concurrency | A managed-identity Blob lease serializes champion selection and endpoint-default mutation across AML runs. |
 | Deployment | Batch invocation names the selected deployment; it does not depend on an endpoint default changing later. |
 | Publication | A failed load or merge rolls back; retries update the same stable prediction IDs. |
 | Events | Event Grid is at-least-once; deterministic retraining job names make handling idempotent after AML state recheck. |
@@ -74,7 +75,7 @@ Requires Python 3.12. No Azure or Snowflake credentials are needed.
 
 ```bash
 python3.12 -m venv .venv
-.venv/bin/python -m pip install -e '.[dev]'
+.venv/bin/python -m pip install -e '.[all]'
 .venv/bin/python -m pytest -q
 .venv/bin/python -m azureml_snowflake_poc.demo --scenario all --output .validation/demo.json
 .venv/bin/aml-poc-validate
@@ -105,6 +106,8 @@ Exact commands, pass conditions, failure triage, and rollback steps are in [docs
 ## Deliberate limits
 
 This repository is a deployable reference, not a production guarantee. Before production use, verify target-region support and quotas, private endpoint/DNS design, Snowflake External OAuth claims, organizational RBAC, retention, cost limits, and incident routing. The default Bicep permits public network access for a demonstrable POC; private networking is a separate deployment decision.
+
+The currently verified maturity is Level 2-aligned. Level 3/4 surfaces are implemented as activation templates but remain aspirational until the live exit evidence in [docs/maturity-roadmap.md](docs/maturity-roadmap.md) is collected.
 
 Managed Feature Store and model-performance monitoring capabilities can be region- or preview-dependent. The pipeline remains fully AML-executed even when those optional managed surfaces are unavailable: it builds versioned AML data artifacts, performs its own point-in-time join, and preserves the same feature/version evidence.
 

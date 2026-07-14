@@ -8,6 +8,7 @@ azure:
   model_name: exact-quantity-classifier
   inference_environment: azureml:aml-snowflake-poc-runtime:1
   scoring_code_path: azureml/scoring
+  promotion_lock_blob_url: https://CHANGE_ME_STORAGE_ACCOUNT.blob.core.windows.net/promotion-locks/endpoint-default.lock
   feature_store_name: CHANGE_ME_FEATURE_STORE_NAME
   feature_set_name: exact_quantity_features
   feature_set_version: "1"

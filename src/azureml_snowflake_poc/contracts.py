@@ -72,6 +72,17 @@ def validate_scoring_population(frame: pd.DataFrame) -> None:
         raise ContractViolation(f"scoring population contains label column(s): {', '.join(leaked)}")
 
 
+def validate_correlation_ids(frame: pd.DataFrame, column: str) -> None:
+    """Require one non-null, non-blank correlation identity per scoring row."""
+    if column not in frame.columns:
+        raise ContractViolation(f"scoring population is missing correlation column {column!r}")
+    values = frame[column]
+    if values.isna().any() or values.astype(str).str.strip().eq("").any():
+        raise ContractViolation("scoring correlation IDs must be non-null and non-blank")
+    if values.astype(str).duplicated().any():
+        raise ContractViolation("scoring correlation IDs must be unique")
+
+
 def label_actuals(
     actuals: pd.DataFrame,
     contract: QuantityClassContract,

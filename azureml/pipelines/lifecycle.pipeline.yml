@@ -5,7 +5,7 @@ experiment_name: azureml-snowflake-control-plane-poc
 description: Pull Snowflake snapshots, train/register/select in AML, batch score, and publish atomically.
 settings:
   default_compute: azureml:aml-cpu-cluster
-  force_rerun: false
+  force_rerun: true
   continue_on_step_failure: false
 inputs:
   config:

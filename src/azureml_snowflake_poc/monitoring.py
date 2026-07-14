@@ -38,6 +38,12 @@ def _probability(settings: Mapping[str, Any], key: str) -> float:
     return float(value)
 
 
+def apply_schedule(ml_client: Any, schedule: Any) -> str:
+    """Create or update one AML monitor schedule and wait for completion."""
+    updated = ml_client.schedules.begin_create_or_update(schedule).result()
+    return str(updated.name)
+
+
 def render_schedule(
     template: str,
     *,

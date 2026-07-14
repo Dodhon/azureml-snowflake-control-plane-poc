@@ -43,7 +43,9 @@ def _validate_identifier(identifier: str) -> tuple[str, ...]:
 def _merge_sql(target_table: str, staging_table: str) -> str:
     target = ".".join(_validate_identifier(target_table))
     staging = ".".join(_validate_identifier(staging_table))
-    update_columns = tuple(column for column in PREDICTION_COLUMNS if column != "PREDICTION_ID")
+    update_columns = tuple(
+        column for column in PREDICTION_COLUMNS if column not in {"PREDICTION_ID", "CREATED_AT"}
+    )
     updates = ",\n        ".join(f"target.{column} = source.{column}" for column in update_columns)
     insert_columns = ", ".join(PREDICTION_COLUMNS)
     insert_values = ", ".join(f"source.{column}" for column in PREDICTION_COLUMNS)

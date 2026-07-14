@@ -22,6 +22,7 @@ Do not commit credentials, tokens, private keys, tenant-specific secrets, or ren
 | `CHANGE_ME_RESOURCE_GROUP` | target resource group | Azure platform owner |
 | `CHANGE_ME_WORKSPACE_NAME` | deployed AML workspace | Azure platform owner |
 | `CHANGE_ME_FEATURE_STORE_NAME` | deployed managed Feature Store workspace | ML platform owner |
+| `CHANGE_ME_STORAGE_ACCOUNT` | storage account hosting the promotion-lock Blob container | Azure platform owner |
 | `CHANGE_ME_ACCOUNT_IDENTIFIER` | Snowflake account identifier accepted by the connector | Snowflake administrator |
 | `CHANGE_ME_SERVICE_USER` | Snowflake service user mapped to the Azure workload identity | Snowflake administrator |
 | `CHANGE_ME_ML_ROLE` | least-privilege Snowflake role | Snowflake administrator |
@@ -78,7 +79,7 @@ Required aliases:
 
 | Population | Required fields |
 |---|---|
-| current scoring | `ENTITY_ID`, `FEATURE_TS`, `SIGNAL_A`, `SIGNAL_B`, `SOURCE_BATCH_ID` |
+| current scoring | `ENTITY_ID`, `FEATURE_TS`, `SIGNAL_A`, `SIGNAL_B`, `CORRELATION_ID`, `SOURCE_BATCH_ID` |
 | training features | `ENTITY_ID`, `FEATURE_TS`, feature columns |
 | delayed actuals | `ENTITY_ID`, `EVENT_TS`, `LABEL_AVAILABLE_TS`, `ACTUAL_QUANTITY`, `CORRELATION_ID` |
 
@@ -91,6 +92,8 @@ The configured quantity is finite, non-negative, integral, and inside `[minimum,
 ## Promotion policy
 
 Every configured metric rule is mandatory. Candidate promotion also requires a complete candidate result and a resolvable champion comparison when a champion exists. The default rules are repository examples, not empirically justified production thresholds. Change them only with a documented offline evaluation and retain the evidence with the model run.
+
+`azure.promotion_lock_blob_url` must be the deployment output for the dedicated `promotion-locks/endpoint-default.lock` blob. AML compute acquires an infinite Blob lease before reading the champion and keeps it through registration, deployment, and endpoint-default mutation. This serializes promotion across pipeline runs; operators must treat lease breaking as a recovery action, not a retry shortcut. [S23]
 
 ## Monitoring configuration
 
@@ -117,7 +120,7 @@ Monitor assets are created from one completed pipeline job so all four inputs sh
 |---|---:|---|
 | `location` | resource-group location | target region must support selected AML/Feature Store/Function resources and VM SKU |
 | `publicNetworkAccess` | `Enabled` | POC supports public endpoints only; do not set Disabled without private endpoints and DNS |
-| `deploymentOperatorObjectId` | empty | grants Key Vault Administrator to that user when supplied |
+| `deploymentOperatorObjectId` | empty | grants Key Vault Administrator and promotion-container Blob Data Contributor to that user when supplied |
 | `retrainOnMonitorBreach` | `false` | enables guarded Function job submission; does not bypass promotion policy |
 | `retrainingSourceBatchId` | empty | required business batch when event retraining is enabled |
 
@@ -126,5 +129,6 @@ Event Grid deployment takes the resource names and user-assigned identity ID out
 ## Works Cited
 
 - **[S9]** Snowflake, [External OAuth overview](https://docs.snowflake.com/en/user-guide/oauth-ext-overview).
+- **[S23]** Microsoft, [Create and manage blob leases with Python](https://learn.microsoft.com/en-us/azure/storage/blobs/storage-blob-lease-python).
 - Microsoft, [Authenticate to Azure services from Azure Machine Learning](https://learn.microsoft.com/en-us/azure/machine-learning/how-to-identity-based-service-authentication?view=azureml-api-2).
 - Microsoft, [Azure Machine Learning CLI/YAML reference](https://learn.microsoft.com/en-us/azure/machine-learning/reference-yaml-overview?view=azureml-api-2).

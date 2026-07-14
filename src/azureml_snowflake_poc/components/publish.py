@@ -17,6 +17,40 @@ from azureml_snowflake_poc.snowflake_io import connect
 from azureml_snowflake_poc.snowflake_publish import publish_predictions
 
 
+def reconcile_prediction_keys(
+    features: pd.DataFrame,
+    predictions: pd.DataFrame,
+    *,
+    entity_column: str,
+    timestamp_column: str,
+    correlation_column: str,
+) -> None:
+    """Require batch output to preserve every scoring identity exactly once."""
+    expected_keys = features.loc[
+        :, [entity_column, timestamp_column, "source_batch_id", correlation_column]
+    ].copy()
+    expected_keys.columns = [
+        "entity_id",
+        "prediction_ts",
+        "source_batch_id",
+        "correlation_id",
+    ]
+    actual_keys = predictions.loc[
+        :, ["entity_id", "prediction_ts", "source_batch_id", "correlation_id"]
+    ].copy()
+    for frame in (expected_keys, actual_keys):
+        frame["entity_id"] = frame["entity_id"].astype(str)
+        frame["prediction_ts"] = pd.to_datetime(frame["prediction_ts"], utc=True)
+        frame["source_batch_id"] = frame["source_batch_id"].astype(str)
+        frame["correlation_id"] = frame["correlation_id"].astype(str)
+    if actual_keys.duplicated().any():
+        raise ValueError("batch predictions contain duplicate correlation keys")
+    reconciled = expected_keys.merge(actual_keys, how="outer", indicator=True)
+    if not reconciled["_merge"].eq("both").all():
+        counts = reconciled["_merge"].value_counts().to_dict()
+        raise ValueError(f"batch prediction reconciliation failed: {counts}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, required=True)
@@ -64,21 +98,13 @@ def main() -> int:
     entity_column = require(config, "data_contract.entity_column")
     timestamp_column = require(config, "data_contract.feature_timestamp_column")
     correlation_column = require(config, "data_contract.correlation_column")
-    expected_keys = features.loc[:, [entity_column, timestamp_column, correlation_column]].copy()
-    expected_keys.columns = ["entity_id", "prediction_ts", "correlation_id"]
-    expected_keys["entity_id"] = expected_keys["entity_id"].astype(str)
-    expected_keys["prediction_ts"] = pd.to_datetime(expected_keys["prediction_ts"], utc=True)
-    expected_keys["correlation_id"] = expected_keys["correlation_id"].astype(str)
-    actual_keys = predictions.loc[:, ["entity_id", "prediction_ts", "correlation_id"]].copy()
-    actual_keys["entity_id"] = actual_keys["entity_id"].astype(str)
-    actual_keys["prediction_ts"] = pd.to_datetime(actual_keys["prediction_ts"], utc=True)
-    actual_keys["correlation_id"] = actual_keys["correlation_id"].astype(str)
-    if actual_keys.duplicated().any():
-        raise ValueError("batch predictions contain duplicate correlation keys")
-    reconciled = expected_keys.merge(actual_keys, how="outer", indicator=True)
-    if not reconciled["_merge"].eq("both").all():
-        counts = reconciled["_merge"].value_counts().to_dict()
-        raise ValueError(f"batch prediction reconciliation failed: {counts}")
+    reconcile_prediction_keys(
+        features,
+        predictions,
+        entity_column=entity_column,
+        timestamp_column=timestamp_column,
+        correlation_column=correlation_column,
+    )
 
     selection = read_json(args.selection)
     selected = selection["selected"]

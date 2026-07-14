@@ -9,7 +9,12 @@ import pandas as pd
 
 from azureml_snowflake_poc.component_io import read_parquet_folder, write_json, write_parquet
 from azureml_snowflake_poc.configuration import load_configuration, require
-from azureml_snowflake_poc.contracts import ContractViolation, QuantityClassContract, label_actuals
+from azureml_snowflake_poc.contracts import (
+    ContractViolation,
+    QuantityClassContract,
+    label_actuals,
+    validate_correlation_ids,
+)
 from azureml_snowflake_poc.features import build_feature_frame, build_training_spine
 
 
@@ -46,6 +51,7 @@ def main() -> int:
             raise ContractViolation("Snowflake training-feature pull returned no rows")
         if actuals.empty:
             raise ContractViolation("Snowflake actuals pull returned no rows")
+        validate_correlation_ids(scoring, correlation_column)
         features = build_feature_frame(
             scoring,
             entity_column=entity_column,

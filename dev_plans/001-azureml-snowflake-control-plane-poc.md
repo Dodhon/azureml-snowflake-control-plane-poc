@@ -252,7 +252,7 @@ Commits may be combined if each intermediate state cannot remain internally cons
 - V4: `python scripts/run_local_demo.py --scenario all --output outputs/demo` twice, then compare manifests — five scenarios and deterministic rerun pass.
 - V5: `python scripts/validate_aml_assets.py` — Azure SDK v2 loads supported component/pipeline assets without cloud calls.
 - V6: `bicep build infra/main.bicep` — IaC compiles using a temporary standalone compiler.
-- V7: clean temporary clone, create venv, install `.[dev]`, rerun V1-V5.
+- V7: clean temporary clone, create venv, install `.[all]`, rerun V1-V5.
 - V8: secret scan across tracked files and staged diff; zero findings.
 - V9: create public repository, push branches, merge validated PR, fetch public URL, verify default branch and representative files.
 

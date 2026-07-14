@@ -11,10 +11,11 @@ from pathlib import Path
 from azure.ai.ml import MLClient
 from azure.ai.ml.constants import AssetTypes
 from azure.ai.ml.entities import Data
+from azure.ai.ml.entities._load_functions import load_schedule
 from azure.identity import DefaultAzureCredential
 
 from azureml_snowflake_poc.configuration import load_configuration, require
-from azureml_snowflake_poc.monitoring import MONITOR_ASSETS, render_schedule
+from azureml_snowflake_poc.monitoring import MONITOR_ASSETS, apply_schedule, render_schedule
 
 
 def client() -> MLClient:
@@ -29,6 +30,55 @@ def client() -> MLClient:
         values["AZURE_RESOURCE_GROUP"],
         values["AZUREML_WORKSPACE_NAME"],
     )
+
+
+def configure(
+    args: argparse.Namespace,
+    ml_client: MLClient | None,
+    *,
+    schedule_loader=load_schedule,
+) -> str | None:
+    """Render and validate one job-derived schedule, then optionally apply it."""
+    config = load_configuration(args.config)
+    monitoring = require(config, "monitoring", dict)
+    version = hashlib.sha256(args.job_name.encode()).hexdigest()[:12]
+    assets: list[tuple[str, str]] = []
+    if not args.render_only:
+        if ml_client is None:
+            raise RuntimeError("Azure ML client is required when applying a monitor")
+        job = ml_client.jobs.get(args.job_name)
+        if str(job.status).casefold() != "completed":
+            raise RuntimeError(f"pipeline job must be Completed, got {job.status}")
+        for output_name, asset_name in MONITOR_ASSETS.items():
+            output = job.outputs.get(output_name)
+            path = getattr(output, "path", None)
+            if not path:
+                raise RuntimeError(f"pipeline output {output_name!r} has no durable AML path")
+            assets.append((asset_name, path))
+
+    rendered = render_schedule(
+        args.template.read_text(encoding="utf-8"),
+        endpoint_name=args.endpoint_name,
+        deployment_name=args.deployment_name,
+        version=version,
+        email=args.email,
+        monitoring=monitoring,
+    )
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(rendered, encoding="utf-8")
+    schedule = schedule_loader(source=args.output)
+    print(args.output)
+    if args.render_only:
+        return None
+    assert ml_client is not None
+
+    for asset_name, path in assets:
+        ml_client.data.create_or_update(
+            Data(name=asset_name, version=version, path=path, type=AssetTypes.MLTABLE)
+        )
+    name = apply_schedule(ml_client, schedule)
+    print(f"updated Azure ML schedule: {name}")
+    return name
 
 
 def main() -> int:
@@ -48,35 +98,13 @@ def main() -> int:
         type=Path,
         default=Path(".validation/model-monitor.rendered.yml"),
     )
-    args = parser.parse_args()
-    config = load_configuration(args.config)
-    monitoring = require(config, "monitoring", dict)
-
-    ml_client = client()
-    job = ml_client.jobs.get(args.job_name)
-    if str(job.status).casefold() != "completed":
-        raise RuntimeError(f"pipeline job must be Completed, got {job.status}")
-    version = hashlib.sha256(args.job_name.encode()).hexdigest()[:12]
-    for output_name, asset_name in MONITOR_ASSETS.items():
-        output = job.outputs.get(output_name)
-        path = getattr(output, "path", None)
-        if not path:
-            raise RuntimeError(f"pipeline output {output_name!r} has no durable AML path")
-        ml_client.data.create_or_update(
-            Data(name=asset_name, version=version, path=path, type=AssetTypes.MLTABLE)
-        )
-
-    rendered = render_schedule(
-        args.template.read_text(encoding="utf-8"),
-        endpoint_name=args.endpoint_name,
-        deployment_name=args.deployment_name,
-        version=version,
-        email=args.email,
-        monitoring=monitoring,
+    parser.add_argument(
+        "--render-only",
+        action="store_true",
+        help="Render and validate the schedule without updating Azure ML.",
     )
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(rendered, encoding="utf-8")
-    print(args.output)
+    args = parser.parse_args()
+    configure(args, None if args.render_only else client())
     return 0
 
 
