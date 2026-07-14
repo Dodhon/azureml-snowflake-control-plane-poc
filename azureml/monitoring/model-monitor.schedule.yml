@@ -1,0 +1,80 @@
+$schema: http://azureml/sdk-2-0/Schedule.json
+name: exact_quantity_model_monitoring
+display_name: Exact quantity production monitoring
+description: AML-native data drift, prediction drift, and delayed-label performance monitoring.
+trigger:
+  type: recurrence
+  frequency: CHANGE_ME_MONITOR_FREQUENCY
+  interval: CHANGE_ME_MONITOR_INTERVAL
+  schedule:
+    hours: CHANGE_ME_MONITOR_HOURS
+    minutes: CHANGE_ME_MONITOR_MINUTES
+create_monitor:
+  compute:
+    instance_type: standard_e8s_v3
+    runtime_version: "3.4"
+  monitoring_target:
+    ml_task: classification
+    endpoint_deployment_id: azureml:CHANGE_ME_ENDPOINT:CHANGE_ME_DEPLOYMENT
+  monitoring_signals:
+    feature_data_drift:
+      type: data_drift
+      production_data:
+        input_data:
+          path: azureml:CHANGE_ME_MODEL_INPUTS_ASSET:CHANGE_ME_ASSET_VERSION
+          type: mltable
+        data_context: model_inputs
+      reference_data:
+        input_data:
+          path: azureml:CHANGE_ME_REFERENCE_ASSET:CHANGE_ME_ASSET_VERSION
+          type: mltable
+        data_context: training
+        data_column_names:
+          target_column: quantity_class
+      features:
+        - signal_a
+        - signal_b
+      alert_enabled: true
+      metric_thresholds:
+        numerical:
+          jensen_shannon_distance: CHANGE_ME_DATA_DRIFT_THRESHOLD
+    prediction_drift:
+      type: prediction_drift
+      production_data:
+        input_data:
+          path: azureml:CHANGE_ME_MODEL_OUTPUTS_ASSET:CHANGE_ME_ASSET_VERSION
+          type: mltable
+        data_context: model_outputs
+      reference_data:
+        input_data:
+          path: azureml:CHANGE_ME_REFERENCE_ASSET:CHANGE_ME_ASSET_VERSION
+          type: mltable
+        data_context: validation
+      alert_enabled: true
+      metric_thresholds:
+        categorical:
+          pearsons_chi_squared_test: CHANGE_ME_PREDICTION_DRIFT_P_VALUE
+    delayed_label_performance:
+      type: model_performance
+      production_data:
+        input_data:
+          path: azureml:CHANGE_ME_MODEL_OUTPUTS_ASSET:CHANGE_ME_ASSET_VERSION
+          type: mltable
+        data_column_names:
+          prediction: prediction_class
+          correlation_id: correlation_id
+      reference_data:
+        input_data:
+          path: azureml:CHANGE_ME_GROUND_TRUTH_ASSET:CHANGE_ME_ASSET_VERSION
+          type: mltable
+        data_column_names:
+          actual: actual_class
+          correlation_id: correlation_id
+        data_context: ground_truth
+      alert_enabled: true
+      metric_thresholds:
+        classification:
+          accuracy: CHANGE_ME_PERFORMANCE_THRESHOLD
+  alert_notification:
+    emails:
+      - CHANGE_ME_OPERATOR_EMAIL

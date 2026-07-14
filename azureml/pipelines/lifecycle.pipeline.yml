@@ -27,6 +27,16 @@ outputs:
     type: uri_file
   publish_result:
     type: uri_file
+  monitor_model_inputs:
+    type: uri_folder
+  monitor_model_outputs:
+    type: uri_folder
+  monitor_reference_data:
+    type: uri_folder
+  monitor_ground_truth:
+    type: uri_folder
+  monitor_manifest:
+    type: uri_file
 jobs:
   pull:
     type: command
@@ -87,3 +97,19 @@ jobs:
       selection: ${{parent.jobs.register_select.outputs.selection}}
     outputs:
       publish_result: ${{parent.outputs.publish_result}}
+  prepare_monitor_data:
+    type: command
+    component: ../components/prepare_monitor_data/component.yml
+    inputs:
+      config: ${{parent.inputs.config}}
+      feature_snapshot: ${{parent.jobs.build_features.outputs.feature_snapshot}}
+      training_snapshot: ${{parent.jobs.build_features.outputs.training_snapshot}}
+      actuals_snapshot: ${{parent.jobs.pull.outputs.actuals_snapshot}}
+      predictions: ${{parent.jobs.invoke_batch.outputs.predictions}}
+      publish_result: ${{parent.jobs.publish.outputs.publish_result}}
+    outputs:
+      model_inputs: ${{parent.outputs.monitor_model_inputs}}
+      model_outputs: ${{parent.outputs.monitor_model_outputs}}
+      reference_data: ${{parent.outputs.monitor_reference_data}}
+      ground_truth: ${{parent.outputs.monitor_ground_truth}}
+      monitor_manifest: ${{parent.outputs.monitor_manifest}}
