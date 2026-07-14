@@ -1,0 +1,10 @@
+$schema: https://azuremlschemas.azureedge.net/latest/featureStoreEntity.schema.json
+name: exact_quantity_entity
+version: "1"
+description: Stable entity key shared by training and scoring feature retrieval.
+index_columns:
+  - name: entity_id
+    type: string
+stage: Development
+tags:
+  pii: "false"

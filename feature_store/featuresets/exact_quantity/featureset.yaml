@@ -1,0 +1,12 @@
+$schema: http://azureml/sdk-2-0/FeatureSet.json
+name: exact_quantity_features
+version: "1"
+description: AML-engineered predictor features with point-in-time entity semantics.
+stage: Development
+entities:
+  - azureml:exact_quantity_entity:1
+specification:
+  path: ./spec
+materialization_settings:
+  offline_enabled: false
+  online_enabled: false
