@@ -55,13 +55,15 @@ export RESOURCE_GROUP='<resource-group>'
 export LOCATION='<azure-region>'
 export PREFIX='<2-to-12-char-lowercase-prefix>'
 export DEPLOYMENT_NAME='aml-snowflake-poc'
+export DEPLOYMENT_OPERATOR_OBJECT_ID="$(az ad signed-in-user show --query id -o tsv)"
 
 az group create --name "$RESOURCE_GROUP" --location "$LOCATION"
 az deployment group create \
   --name "$DEPLOYMENT_NAME" \
   --resource-group "$RESOURCE_GROUP" \
   --template-file infra/main.bicep \
-  --parameters prefix="$PREFIX" location="$LOCATION"
+  --parameters prefix="$PREFIX" location="$LOCATION" \
+               deploymentOperatorObjectId="$DEPLOYMENT_OPERATOR_OBJECT_ID"
 
 az deployment group show \
   --name "$DEPLOYMENT_NAME" \
@@ -78,7 +80,10 @@ export FEATURE_STORE='<featureStoreName.value>'
 export FUNCTION_APP='<functionAppName.value>'
 export STORAGE_ACCOUNT='<storageAccountName.value>'
 export EVENT_GRID_IDENTITY_ID='<eventGridIdentityId.value>'
+export PROMOTION_LOCK_BLOB_URL='<promotionLockBlobUrl.value>'
 ```
+
+Set `azure.promotion_lock_blob_url` in `config/poc.yaml` to `$PROMOTION_LOCK_BLOB_URL`. Supplying `deploymentOperatorObjectId` grants the named operator Key Vault administration for initial setup; omit it only when another identity already owns vault configuration.
 
 The POC supports public service endpoints. Do not set `publicNetworkAccess=Disabled`; the template intentionally rejects it until private endpoints and DNS are added.
 
@@ -124,6 +129,8 @@ A valid terminal run has:
 - reconciled prediction count equal to expected scoring keys;
 - `PUBLISHED` result after Snowflake commit;
 - four monitor datasets and a monitor manifest.
+
+The compute identity holds the Blob lease while model selection changes the endpoint default. If a process terminates while holding the infinite lease, inspect the failed AML job and break only the exact `promotion-locks/endpoint-default.lock` lease before retrying; breaking a live lease can reintroduce concurrent promotion.
 
 ## 7. Verify Snowflake publication
 
@@ -188,11 +195,10 @@ export AZUREML_WORKSPACE_NAME="$AML_WORKSPACE"
   --endpoint-name "$BATCH_ENDPOINT" \
   --deployment-name "$BATCH_DEPLOYMENT" \
   --email "$ALERT_EMAIL"
-
-az ml schedule create --file .validation/model-monitor.rendered.yml
 ```
 
-The renderer refuses non-completed pipeline jobs and outputs without durable AML paths. Keep the rendered file out of Git.
+The script always SDK-validates the rendered schedule. Normal mode requires a completed pipeline job, validates all four durable AML output paths, creates or updates their Data assets, and creates or updates the schedule. `--render-only` performs credential-free rendering and SDK validation without reading or mutating Azure. Keep the rendered file out of Git, but retain each applied job/deployment tuple as release evidence for rollback.
+
 
 ## 10. Deploy Function and Event Grid
 
@@ -243,6 +249,7 @@ The Function still rechecks AML run status, derives one job name from the Event 
 | Key Vault 403 | compute principal ID and role assignment | wait for RBAC propagation; verify vault scope |
 | data decision `BLOCK` | `data_decision` output | repair alias/domain/point-in-time contract; submit new run |
 | deployment concurrency error | selection output and endpoint default | re-read endpoint state; rerun selection against current champion |
+| promotion waits on Blob lease | promotion lock blob and active AML jobs | confirm no promotion is live; break a stale lease only after the failed holder is terminal |
 | missing/extra batch rows | `scoring_result` and `publish_result` | inspect batch driver schema and correlation IDs; no Snowflake write occurred |
 | Snowflake write failure | AML publish log/query tag | verify grants/table schema; transaction rollback is attempted |
 | monitor schedule rejected | rendered YAML and pinned SDK validation | confirm target-region monitor v2 support and current preview contract |
@@ -254,11 +261,58 @@ The Function still rechecks AML run status, derives one job name from the Event 
 ### Model rollback
 
 1. Identify the last known model version and its deployment from AML registry/run evidence.
-2. Set the batch endpoint default deployment back to that immutable deployment.
-3. Run a bounded scoring batch and reconcile its output.
-4. Resume Snowflake publication only after reconciliation passes.
+2. Confirm no promotion job is active, set `LEASE_ID` to a new GUID, and acquire the operator lease:
+
+   ```bash
+   az storage blob lease acquire \
+     --account-name "$STORAGE_ACCOUNT" \
+     --container-name promotion-locks \
+     --blob-name endpoint-default.lock \
+     --lease-duration -1 \
+     --proposed-lease-id "$LEASE_ID" \
+     --auth-mode login
+   ```
+
+3. Install an `EXIT` trap that releases this exact lease ID, then set the batch endpoint default back to the immutable deployment:
+
+   ```bash
+   release_promotion_lease() {
+     az storage blob lease release \
+       --account-name "$STORAGE_ACCOUNT" \
+       --container-name promotion-locks \
+       --blob-name endpoint-default.lock \
+       --lease-id "$LEASE_ID" \
+       --auth-mode login
+   }
+   trap release_promotion_lease EXIT
+   az ml batch-endpoint update \
+     --name "$BATCH_ENDPOINT" \
+     --set defaults.deployment_name="$LAST_KNOWN_GOOD_DEPLOYMENT"
+   ```
+
+4. Run a bounded scoring batch and reconcile its output.
+5. Resume Snowflake publication only after reconciliation passes.
+6. Call `release_promotion_lease`, then clear the trap with `trap - EXIT`. If the operator process dies first, verify it is terminal before running:
+
+   ```bash
+   az storage blob lease break \
+     --account-name "$STORAGE_ACCOUNT" \
+     --container-name promotion-locks \
+     --blob-name endpoint-default.lock \
+     --auth-mode login
+   ```
+
+The acquire/release/break syntax and `--auth-mode login` behavior are documented in the [Azure CLI Blob lease reference](https://learn.microsoft.com/en-us/cli/azure/storage/blob/lease?view=azure-cli-latest).
 
 Do not delete the failed model version; retain it for audit.
+
+### Monitor rollback
+
+1. Set `MONITOR_SCHEDULE_NAME='exact_quantity_model_monitoring'`, matching the committed schedule template, then run `az ml schedule disable --name "$MONITOR_SCHEDULE_NAME"`.
+2. Re-run `scripts/configure_monitor.py` with the previous known-good completed AML job, endpoint, deployment, email, and configuration recorded in release evidence.
+3. Verify the restored asset version and schedule, then run `az ml schedule enable --name "$MONITOR_SCHEDULE_NAME"`.
+
+Disabling is the fail-closed action when prior release evidence is unavailable; do not leave a known-bad schedule enabled.
 
 ### Event automation rollback
 

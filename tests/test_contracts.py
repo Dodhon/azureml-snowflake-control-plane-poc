@@ -9,6 +9,7 @@ from azureml_snowflake_poc.contracts import (
     ContractViolation,
     QuantityClassContract,
     label_actuals,
+    validate_correlation_ids,
     validate_scoring_population,
 )
 
@@ -31,6 +32,16 @@ def test_scoring_population_cannot_contain_labels() -> None:
 
     with pytest.raises(ContractViolation, match="label column"):
         validate_scoring_population(scoring)
+
+
+@pytest.mark.parametrize("values", [[None], [" "], ["same", "same"]])
+def test_scoring_correlation_ids_are_complete_and_unique(values: list[object]) -> None:
+    # Contract: one durable business-event identity follows each scoring row into monitoring.
+    # Edge: null, blank, or duplicate IDs must fail before endpoint invocation or publication.
+    scoring = pd.DataFrame({"correlation_id": values})
+
+    with pytest.raises(ContractViolation, match="correlation IDs"):
+        validate_correlation_ids(scoring, "correlation_id")
 
 
 def test_actuals_are_labeled_with_the_declared_mapping_version() -> None:

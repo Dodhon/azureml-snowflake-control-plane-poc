@@ -2,6 +2,8 @@
 
 This repository is organized as a minimum working POC followed by capability phases. The ordering uses Microsoft's five-level MLOps maturity model as a guide, not as a claim that a repository alone changes organizational maturity. Teams can exhibit capabilities from several levels at once. [S1]
 
+**Current verified status:** Level 2-aligned reference POC. The repository implements Level 3/4 capability templates, but those phases remain aspirational until their live Azure/Snowflake exit evidence below is collected. Static SDK/Bicep validation and credential-free tests do not establish tenant, release-environment, monitoring-delivery, or organizational maturity.
+
 ## Minimum POC: reproducible lifecycle
 
 **Guide alignment:** Level 2 automated training, plus one controlled batch release path needed to prove the Snowflake output boundary.

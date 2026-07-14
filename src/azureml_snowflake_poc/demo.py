@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+from sklearn.dummy import DummyClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import f1_score, log_loss
 
@@ -173,6 +174,10 @@ def run_scenario(scenario: Scenario) -> ScenarioResult:
 
     model, candidate_metrics = _train_model(training_features, actuals)
     champion_metrics = {"macro_f1": 0.78, "log_loss": 0.62}
+    champion_model = DummyClassifier(strategy="constant", constant="1").fit(
+        training_features[["feature_a", "feature_b"]],
+        label_actuals(actuals, _CONTRACT)["quantity_class"],
+    )
     if scenario is Scenario.WEAK_CANDIDATE:
         candidate_metrics = {"macro_f1": 0.52, "log_loss": 1.10}
 
@@ -183,6 +188,7 @@ def run_scenario(scenario: Scenario) -> ScenarioResult:
         has_production_deployment=True,
     )
     selected_version = "2" if decision.outcome is PromotionOutcome.PROMOTE else "1"
+    selected_model = model if decision.outcome is PromotionOutcome.PROMOTE else champion_model
     if scenario is Scenario.TECHNICAL_FAILURE:
         return _result(
             scenario,
@@ -195,7 +201,9 @@ def run_scenario(scenario: Scenario) -> ScenarioResult:
 
     scoring = _scoring_data(drift=scenario is Scenario.DRIFT)
     validate_scoring_population(scoring)
-    predicted = [str(value) for value in model.predict(scoring[["feature_a", "feature_b"]])]
+    predicted = [
+        str(value) for value in selected_model.predict(scoring[["feature_a", "feature_b"]])
+    ]
     rows = tuple(
         {
             "prediction_id": prediction_id(
@@ -215,7 +223,8 @@ def run_scenario(scenario: Scenario) -> ScenarioResult:
         for row, prediction_class in zip(scoring.itertuples(index=False), predicted, strict=True)
     )
     reference_predictions = [
-        str(value) for value in model.predict(training_features[["feature_a", "feature_b"]])
+        str(value)
+        for value in selected_model.predict(training_features[["feature_a", "feature_b"]])
     ]
     monitor_alert = _total_variation(reference_predictions, predicted) >= 0.50
     terminal = (

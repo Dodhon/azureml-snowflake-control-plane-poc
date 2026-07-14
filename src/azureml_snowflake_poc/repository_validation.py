@@ -42,6 +42,7 @@ _REQUIRED_FILES = {
     "docs/sources.md",
     "infra/event-grid.bicep",
     "infra/main.bicep",
+    "scripts/configure_monitor.py",
     "snowflake/001_prediction_contract.sql",
 }
 
@@ -130,6 +131,78 @@ def _validate_markdown_structure(errors: list[str]) -> None:
                 )
 
 
+def _validate_cross_file_contracts(errors: list[str]) -> None:
+    contracts = {
+        "lifecycle pipeline disables unsafe step reuse": (
+            "azureml/pipelines/lifecycle.pipeline.yml",
+            "force_rerun: true",
+        ),
+        "AML compute receives Feature Store access": (
+            "infra/main.bicep",
+            "computeFeatureStoreRole",
+        ),
+        "AML compute receives workspace access": (
+            "infra/main.bicep",
+            (
+                "resource computeAmlRole "
+                "'Microsoft.Authorization/roleAssignments@2022-04-01' = {\n"
+                "  name: guid(workspace.id, cpuCluster.id, amlDataScientistRole)\n"
+                "  scope: workspace\n"
+                "  properties: {\n"
+                "    principalId: cpuCluster.identity.principalId"
+            ),
+        ),
+        "deployment operator receives Key Vault access": (
+            "infra/main.bicep",
+            "resource operatorVaultRole",
+        ),
+        "deployment operator receives promotion lock access": (
+            "infra/main.bicep",
+            (
+                "resource operatorPromotionLockRole "
+                "'Microsoft.Authorization/roleAssignments@2022-04-01' = "
+                "if (!empty(deploymentOperatorObjectId)) {\n"
+                "  name: guid(promotionLocks.id, deploymentOperatorObjectId, "
+                "storageBlobDataContributorRole)\n"
+                "  scope: promotionLocks\n"
+                "  properties: {\n"
+                "    principalId: deploymentOperatorObjectId"
+            ),
+        ),
+        "promotion lock container is provisioned": (
+            "infra/main.bicep",
+            "resource promotionLocks",
+        ),
+        "promotion lock URL is configured": (
+            "config/poc.yaml",
+            "promotion_lock_blob_url:",
+        ),
+        "promotion gateway requires configured lock URL": (
+            "src/azureml_snowflake_poc/aml_gateway.py",
+            'promotion_lock_blob_url=require(config, "azure.promotion_lock_blob_url")',
+        ),
+        "monitor configuration applies the schedule": (
+            "scripts/configure_monitor.py",
+            "apply_schedule(ml_client, schedule)",
+        ),
+        "Snowflake warehouse usage is granted": (
+            "snowflake/001_prediction_contract.sql",
+            "GRANT USAGE ON WAREHOUSE",
+        ),
+        "Snowflake target grant is least privilege": (
+            "snowflake/001_prediction_contract.sql",
+            "GRANT INSERT, UPDATE ON TABLE",
+        ),
+    }
+    for label, (relative, expected) in contracts.items():
+        path = ROOT / relative
+        if not path.is_file():
+            errors.append(f"{label}: missing contract file {relative}")
+            continue
+        if expected not in path.read_text(encoding="utf-8"):
+            errors.append(f"{label}: expected {expected!r} in {relative}")
+
+
 def main() -> int:
     errors: list[str] = []
     _validate_required_files(errors)
@@ -137,6 +210,7 @@ def main() -> int:
     _validate_sensitive_context(errors)
     _validate_placeholders(errors)
     _validate_markdown_structure(errors)
+    _validate_cross_file_contracts(errors)
     if errors:
         print("Repository validation failed:")
         for error in errors:

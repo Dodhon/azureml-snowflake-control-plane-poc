@@ -28,6 +28,8 @@ Checked 2026-07-14. Microsoft Learn, Azure schema endpoints, Azure SDK/CLI refer
 | S16 | [Azure Functions Event Grid trigger](https://learn.microsoft.com/en-us/azure/azure-functions/functions-bindings-event-grid?tabs=python-v2%2Cisolated-process%2Cnodejs-v4&pivots=programming-language-python) | Python v2 Event Grid trigger and extension registration |
 | S17 | [Zip deployment for Azure Functions](https://learn.microsoft.com/en-us/azure/azure-functions/deployment-zip-push) | deterministic package plus remote dependency build |
 | S18 | [Identity-based connections for Azure Functions](https://learn.microsoft.com/en-us/azure/azure-functions/functions-reference?tabs=blob&pivots=programming-language-python#connecting-to-host-storage-with-an-identity) | `AzureWebJobsStorage__accountName` and storage data-plane roles |
+| S23 | [Create and manage blob leases with Python](https://learn.microsoft.com/en-us/azure/storage/blobs/storage-blob-lease-python) | cross-run promotion serialization and managed-identity Blob authorization |
+| S25 | [Azure CLI blob lease reference](https://learn.microsoft.com/en-us/cli/azure/storage/blob/lease?view=azure-cli-latest) | operator acquire/release/break recovery commands with Entra authentication |
 
 ## Snowflake boundary
 
@@ -38,6 +40,7 @@ Checked 2026-07-14. Microsoft Learn, Azure schema endpoints, Azure SDK/CLI refer
 | S20 | [Using pandas with the Python connector](https://docs.snowflake.com/en/developer-guide/python-connector/python-connector-pandas) | bounded DataFrame pull and `write_pandas` staging load |
 | S21 | [MERGE command](https://docs.snowflake.com/en/sql-reference/sql/merge) | idempotent stable-key publication |
 | S22 | [Transactions](https://docs.snowflake.com/en/sql-reference/transactions) | explicit transaction boundary and rollback behavior |
+| S24 | [Working with temporary and transient tables](https://docs.snowflake.com/en/user-guide/tables-temp-transient) | temporary staging semantics and why the runtime role does not need schema `CREATE TABLE` |
 
 ## Official implementation examples
 

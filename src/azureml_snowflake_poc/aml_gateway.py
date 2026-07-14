@@ -16,6 +16,7 @@ from azureml_snowflake_poc.gate import (
     PromotionOutcome,
     evaluate_promotion,
 )
+from azureml_snowflake_poc.promotion_lock import serialized_promotion
 
 _MODEL_ID = re.compile(r"/models/(?P<name>[^/]+)/versions/(?P<version>[^/]+)$", re.IGNORECASE)
 _NAME = re.compile(r"[^a-z0-9-]+")
@@ -67,9 +68,16 @@ class ModelSelection:
 class AzureMLGateway:
     """Azure SDK adapter; business policy stays in dependency-light modules."""
 
-    def __init__(self, ml_client: Any, *, retraining_pipeline: Path | None = None) -> None:
+    def __init__(
+        self,
+        ml_client: Any,
+        *,
+        retraining_pipeline: Path | None = None,
+        promotion_lock_blob_url: str | None = None,
+    ) -> None:
         self._client = ml_client
         self._retraining_pipeline = retraining_pipeline
+        self._promotion_lock_blob_url = promotion_lock_blob_url
 
     @classmethod
     def from_environment(cls, *, retraining_pipeline: Path | None = None) -> AzureMLGateway:
@@ -105,7 +113,8 @@ class AzureMLGateway:
                 require(config, "azure.subscription_id"),
                 require(config, "azure.resource_group"),
                 require(config, "azure.workspace_name"),
-            )
+            ),
+            promotion_lock_blob_url=require(config, "azure.promotion_lock_blob_url"),
         )
 
     @staticmethod
@@ -156,6 +165,7 @@ class AzureMLGateway:
             mlflow_run_id=str(mlflow_run_id),
         )
 
+    @serialized_promotion
     def register_and_select(
         self,
         *,
@@ -170,7 +180,7 @@ class AzureMLGateway:
         environment_name: str,
         scoring_code: Path,
     ) -> ModelSelection:
-        """Register every candidate, then gate and optimistically switch the endpoint default."""
+        """Serialize, register, gate, and switch the endpoint default."""
         from azure.ai.ml.constants import AssetTypes, BatchDeploymentOutputAction
         from azure.ai.ml.entities import (
             BatchEndpoint,

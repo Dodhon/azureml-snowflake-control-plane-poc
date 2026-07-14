@@ -18,6 +18,9 @@ def test_five_scenarios_produce_expected_terminal_contracts() -> None:
 
     assert {scenario: result.terminal_state for scenario, result in results.items()} == expected
     assert results[Scenario.INVALID_LABEL].prediction_rows == ()
+    assert {
+        row["prediction_class"] for row in results[Scenario.WEAK_CANDIDATE].prediction_rows
+    } == {"1"}
     assert results[Scenario.TECHNICAL_FAILURE].prediction_rows == ()
     assert results[Scenario.DRIFT].monitor_alert is True
 

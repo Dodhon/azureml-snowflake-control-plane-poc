@@ -95,6 +95,14 @@ resource deadLetters 'Microsoft.Storage/storageAccounts/blobServices/containers@
   }
 }
 
+resource promotionLocks 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
+  parent: blobService
+  name: 'promotion-locks'
+  properties: {
+    publicAccess: 'None'
+  }
+}
+
 resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
   name: keyVaultName
   location: location
@@ -412,6 +420,17 @@ resource featureStoreSecretRole 'Microsoft.Authorization/roleAssignments@2022-04
   }
 }
 
+resource computeAmlRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(workspace.id, cpuCluster.id, amlDataScientistRole)
+  scope: workspace
+  properties: {
+    principalId: cpuCluster.identity.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: amlDataScientistRole
+  }
+}
+
+
 resource computeStorageRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(storage.id, cpuCluster.id, storageBlobDataContributorRole)
   scope: storage
@@ -452,6 +471,16 @@ resource operatorVaultRole 'Microsoft.Authorization/roleAssignments@2022-04-01' 
   }
 }
 
+resource operatorPromotionLockRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(deploymentOperatorObjectId)) {
+  name: guid(promotionLocks.id, deploymentOperatorObjectId, storageBlobDataContributorRole)
+  scope: promotionLocks
+  properties: {
+    principalId: deploymentOperatorObjectId
+    principalType: 'User'
+    roleDefinitionId: storageBlobDataContributorRole
+  }
+}
+
 output workspaceName string = workspace.name
 output workspaceId string = workspace.id
 output functionAppName string = functionApp.name
@@ -461,3 +490,5 @@ output storageAccountName string = storage.name
 output deadLetterContainerId string = deadLetters.id
 output eventGridIdentityId string = eventGridIdentity.id
 output featureStoreName string = featureStore.name
+
+output promotionLockBlobUrl string = 'https://${storage.name}.blob.${environment().suffixes.storage}/promotion-locks/endpoint-default.lock'

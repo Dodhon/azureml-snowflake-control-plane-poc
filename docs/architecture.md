@@ -81,7 +81,7 @@ Current scoring data contains predictors and identity only. Training labels come
 
 The publisher:
 
-1. verifies one prediction for every expected `(entity_id, feature_ts, correlation_id)` key;
+1. verifies one prediction for every expected `(entity_id, feature_ts, source_batch_id, correlation_id)` key;
 2. rejects duplicates, missing rows, extras, stale mapping versions, or selected-model mismatches;
 3. creates a temporary stage table in the target database and schema;
 4. bulk-loads the reconciled frame;
@@ -89,6 +89,8 @@ The publisher:
 6. attempts `ROLLBACK` on any transaction failure.
 
 The repository proves generated SQL and reconciliation behavior locally. Live Snowflake privileges, transaction behavior, and tenant policy remain deployment evidence.
+
+The runtime role intentionally has no `CREATE TABLE` grant. The publisher explicitly creates a session-scoped temporary staging table before `write_pandas` loads it, and Snowflake documents that temporary-table creation does not require that schema privilege. Database/schema/warehouse usage plus source-view `SELECT` and target-table `INSERT`/`UPDATE` remain the least-privilege boundary. [S24]
 
 ## Azure resources and identities
 
@@ -102,6 +104,7 @@ The repository proves generated SQL and reconciliation behavior locally. Live Sn
 - a separate managed Feature Store workspace;
 - a Linux Consumption Function App;
 - a user-assigned identity for Event Grid dead-letter delivery;
+- a private Blob container holding the endpoint-promotion lease;
 - least-privilege role assignments for workspace, compute, Function, Feature Store, and Event Grid identities.
 
 AML workspaces use identity authentication for system datastores. The compute identity reads Key Vault secrets and AML/Feature Store assets. The Function identity can read AML state and submit an idempotently named retraining job. Event Grid receives blob contributor access at the dead-letter container only.
@@ -113,6 +116,10 @@ AML workspaces use identity authentication for system datastores. The compute id
 The POC registers AML-engineered Parquet features in a managed Feature Store; it does not make Snowflake a Feature Store data source. `offline_enabled: false` is intentional in the committed feature set. Before enabling materialization, configure an ADLS Gen2 offline store connection, a materialization identity, and the required storage and workspace RBAC. This avoids presenting an unconfigured schedule as deployable.
 
 The pipeline remains runnable without materialization because its feature-building component writes the versioned AML snapshot directly. Feature Store registration adds discoverability and a reusable contract in Phase A.
+
+## Promotion concurrency boundary
+
+Each register/select component acquires the dedicated Blob lease before it reads the current endpoint default. Registration, candidate/champion comparison, immutable deployment creation, and endpoint-default mutation stay inside that lease. Azure's Blob service is the cross-process serialization authority; an in-memory or per-job lock would not protect concurrent AML runs. The lease is infinite to fail closed on a worker crash and requires explicit operator recovery before another promotion can proceed. [S23]
 
 ## Monitoring and event contract
 
@@ -134,3 +141,8 @@ Azure ML v2 model-monitor threshold failures appear as `Microsoft.MachineLearnin
 | bad model promotion | set batch deployment default to last known model version | invoke and reconcile before new publication |
 
 Infrastructure rollback is deployment-level or resource-group deletion. Snowflake rollback is limited to the POC table and grants in `snowflake/001_prediction_contract.sql`; the script intentionally contains no destructive teardown.
+
+## Works Cited
+
+- **[S23]** Microsoft, [Create and manage blob leases with Python](https://learn.microsoft.com/en-us/azure/storage/blobs/storage-blob-lease-python).
+- **[S24]** Snowflake, [Working with temporary and transient tables](https://docs.snowflake.com/en/user-guide/tables-temp-transient).
