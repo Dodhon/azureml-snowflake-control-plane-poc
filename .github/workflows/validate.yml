@@ -1,0 +1,43 @@
+name: validate
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  python-and-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install project and Azure integration dependencies
+        run: python -m pip install -e '.[all]'
+      - name: Lint
+        run: python -m ruff check src tests scripts functions feature_store azureml/scoring
+      - name: Test
+        run: python -m pytest -q
+      - name: Compile Python
+        run: python -m compileall -q src scripts functions feature_store azureml/scoring
+      - name: Validate Azure ML YAML against pinned SDK
+        run: python scripts/load_azureml_yaml.py
+      - name: Validate public repository contracts
+        run: aml-poc-validate
+      - name: Build Azure Function package
+        run: python scripts/package_function.py --output dist/aml-event-function.zip
+
+  bicep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile infrastructure templates
+        run: |
+          az bicep build --file infra/main.bicep --stdout > /dev/null
+          az bicep build --file infra/event-grid.bicep --stdout > /dev/null

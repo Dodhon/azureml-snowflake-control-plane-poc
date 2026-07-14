@@ -7,7 +7,6 @@ import argparse
 from pathlib import Path
 
 
-
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(

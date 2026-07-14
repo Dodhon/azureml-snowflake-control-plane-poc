@@ -37,6 +37,7 @@ snowflake = [
   "cryptography==48.0.1",
 ]
 dev = [
+  "mlflow==3.13.0",
   "pytest==9.1.1",
   "ruff==0.15.21",
 ]
@@ -57,6 +58,7 @@ all = [
 
 [project.scripts]
 aml-poc-demo = "azureml_snowflake_poc.demo:main"
+aml-poc-validate = "azureml_snowflake_poc.repository_validation:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
