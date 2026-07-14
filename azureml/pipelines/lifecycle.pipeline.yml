@@ -1,0 +1,89 @@
+$schema: https://azuremlschemas.azureedge.net/latest/pipelineJob.schema.json
+type: pipeline
+display_name: Snowflake-to-AzureML exact-quantity lifecycle
+experiment_name: azureml-snowflake-control-plane-poc
+description: Pull Snowflake snapshots, train/register/select in AML, batch score, and publish atomically.
+settings:
+  default_compute: azureml:aml-cpu-cluster
+  force_rerun: false
+  continue_on_step_failure: false
+inputs:
+  config:
+    type: uri_file
+    path: ../../config/poc.yaml
+  source_batch_id: CHANGE_ME_SOURCE_BATCH_ID
+  source_cutoff: "2026-01-01T00:00:00Z"
+  source_event_id: manual
+outputs:
+  source_manifest:
+    type: uri_file
+  data_decision:
+    type: uri_file
+  training_result:
+    type: uri_file
+  selection:
+    type: uri_file
+  scoring_result:
+    type: uri_file
+  publish_result:
+    type: uri_file
+jobs:
+  pull:
+    type: command
+    component: ../components/pull/component.yml
+    inputs:
+      config: ${{parent.inputs.config}}
+      source_batch_id: ${{parent.inputs.source_batch_id}}
+      source_cutoff: ${{parent.inputs.source_cutoff}}
+      source_event_id: ${{parent.inputs.source_event_id}}
+    outputs:
+      manifest: ${{parent.outputs.source_manifest}}
+  build_features:
+    type: command
+    component: ../components/build_features/component.yml
+    inputs:
+      config: ${{parent.inputs.config}}
+      scoring_snapshot: ${{parent.jobs.pull.outputs.scoring_snapshot}}
+      training_features_snapshot: ${{parent.jobs.pull.outputs.training_features_snapshot}}
+      actuals_snapshot: ${{parent.jobs.pull.outputs.actuals_snapshot}}
+    outputs:
+      data_decision: ${{parent.outputs.data_decision}}
+  train:
+    type: command
+    component: ../components/train/component.yml
+    inputs:
+      config: ${{parent.inputs.config}}
+      training_snapshot: ${{parent.jobs.build_features.outputs.training_snapshot}}
+      data_decision: ${{parent.jobs.build_features.outputs.data_decision}}
+      source_manifest: ${{parent.jobs.pull.outputs.manifest}}
+    outputs:
+      training_result: ${{parent.outputs.training_result}}
+  register_select:
+    type: command
+    component: ../components/register_select/component.yml
+    inputs:
+      config: ${{parent.inputs.config}}
+      candidate_model: ${{parent.jobs.train.outputs.candidate_model}}
+      training_result: ${{parent.jobs.train.outputs.training_result}}
+    outputs:
+      selection: ${{parent.outputs.selection}}
+  invoke_batch:
+    type: command
+    component: ../components/invoke_batch/component.yml
+    inputs:
+      config: ${{parent.inputs.config}}
+      selection: ${{parent.jobs.register_select.outputs.selection}}
+      feature_snapshot: ${{parent.jobs.build_features.outputs.feature_snapshot}}
+    outputs:
+      scoring_result: ${{parent.outputs.scoring_result}}
+  publish:
+    type: command
+    component: ../components/publish/component.yml
+    inputs:
+      config: ${{parent.inputs.config}}
+      feature_snapshot: ${{parent.jobs.build_features.outputs.feature_snapshot}}
+      predictions: ${{parent.jobs.invoke_batch.outputs.predictions}}
+      scoring_result: ${{parent.jobs.invoke_batch.outputs.scoring_result}}
+      selection: ${{parent.jobs.register_select.outputs.selection}}
+    outputs:
+      publish_result: ${{parent.outputs.publish_result}}

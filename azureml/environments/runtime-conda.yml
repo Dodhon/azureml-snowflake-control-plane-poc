@@ -1,0 +1,20 @@
+name: aml-snowflake-poc-runtime
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - pip
+  - pip:
+      - azure-ai-ml==1.34.0
+      - azure-eventgrid==4.22.0
+      - azure-identity==1.25.3
+      - azure-keyvault-secrets==4.10.0
+      - cryptography==48.0.1
+      - joblib==1.5.3
+      - azureml-mlflow==1.62.0.post5
+      - mlflow==3.13.0
+      - pandas==2.3.3
+      - pyarrow==24.0.0
+      - PyYAML==6.0.3
+      - scikit-learn==1.9.0
+      - snowflake-connector-python==4.6.0

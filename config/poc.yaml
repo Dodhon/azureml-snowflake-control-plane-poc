@@ -1,0 +1,94 @@
+azure:
+  subscription_id: CHANGE_ME_SUBSCRIPTION_ID
+  resource_group: CHANGE_ME_RESOURCE_GROUP
+  workspace_name: CHANGE_ME_WORKSPACE_NAME
+  location: eastus2
+  batch_compute_name: aml-cpu-cluster
+  batch_endpoint_name: exact-quantity-batch
+  model_name: exact-quantity-classifier
+  inference_environment: azureml:aml-snowflake-poc-runtime:1
+  scoring_code_path: azureml/scoring
+  feature_store_name: CHANGE_ME_FEATURE_STORE_NAME
+  feature_set_name: exact_quantity_features
+  feature_set_version: "1"
+
+snowflake:
+  account: CHANGE_ME_ACCOUNT_IDENTIFIER
+  user: CHANGE_ME_SERVICE_USER
+  role: CHANGE_ME_ML_ROLE
+  warehouse: CHANGE_ME_ML_WAREHOUSE
+  database: CHANGE_ME_DATABASE
+  schema: CHANGE_ME_SCHEMA
+  auth_mode: external_oauth
+  oauth_scope: CHANGE_ME_ENTRA_SNOWFLAKE_SCOPE/.default
+  key_vault_url: https://CHANGE_ME_KEY_VAULT.vault.azure.net
+  private_key_secret_name: snowflake-private-key
+  private_key_passphrase_secret_name: ""
+  predictions_table: CHANGE_ME_DATABASE.CHANGE_ME_SCHEMA.AML_PREDICTIONS
+  source_query: |
+    SELECT
+      ENTITY_ID::STRING AS ENTITY_ID,
+      FEATURE_TS::TIMESTAMP_TZ AS FEATURE_TS,
+      SIGNAL_A::FLOAT AS SIGNAL_A,
+      SIGNAL_B::FLOAT AS SIGNAL_B,
+      CORRELATION_ID::STRING AS CORRELATION_ID,
+      SOURCE_BATCH_ID::STRING AS SOURCE_BATCH_ID
+    FROM CHANGE_ME_DATABASE.CHANGE_ME_SCHEMA.SCORING_SOURCE_VIEW
+    WHERE SOURCE_BATCH_ID = %(source_batch_id)s
+      AND FEATURE_TS <= %(source_cutoff)s
+  training_features_query: |
+    SELECT
+      ENTITY_ID::STRING AS ENTITY_ID,
+      FEATURE_TS::TIMESTAMP_TZ AS FEATURE_TS,
+      SIGNAL_A::FLOAT AS SIGNAL_A,
+      SIGNAL_B::FLOAT AS SIGNAL_B
+    FROM CHANGE_ME_DATABASE.CHANGE_ME_SCHEMA.TRAINING_FEATURE_SOURCE_VIEW
+    WHERE FEATURE_TS <= %(source_cutoff)s
+  actuals_query: |
+    SELECT
+      ENTITY_ID::STRING AS ENTITY_ID,
+      EVENT_TS::TIMESTAMP_TZ AS EVENT_TS,
+      LABEL_AVAILABLE_TS::TIMESTAMP_TZ AS LABEL_AVAILABLE_TS,
+      ACTUAL_QUANTITY::FLOAT AS ACTUAL_QUANTITY,
+      CORRELATION_ID::STRING AS CORRELATION_ID
+    FROM CHANGE_ME_DATABASE.CHANGE_ME_SCHEMA.DELAYED_ACTUALS_VIEW
+    WHERE LABEL_AVAILABLE_TS <= %(source_cutoff)s
+
+data_contract:
+  entity_column: entity_id
+  feature_timestamp_column: feature_ts
+  label_timestamp_column: event_ts
+  actual_quantity_column: actual_quantity
+  correlation_column: correlation_id
+  feature_columns:
+    - signal_a
+    - signal_b
+  point_in_time_tolerance: 30D
+
+quantity_contract:
+  mapping_version: quantity-v1
+  minimum: 0
+  maximum: 20
+
+training:
+  random_seed: 17
+
+promotion:
+  rules:
+    - name: macro_f1
+      direction: maximize
+      threshold: 0.70
+      minimum_delta: 0.01
+    - name: log_loss
+      direction: minimize
+      threshold: 0.90
+      minimum_delta: 0.00
+
+monitoring:
+  frequency: day
+  interval: 1
+  hours: 6
+  minutes: 0
+  data_drift_threshold: 0.25
+  prediction_drift_p_value: 0.05
+  performance_threshold: 0.65

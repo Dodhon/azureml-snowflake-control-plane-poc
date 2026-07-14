@@ -1,0 +1,23 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandComponent.schema.json
+name: register_and_select_candidate
+version: 1
+display_name: Register, gate, and select candidate
+type: command
+inputs:
+  config:
+    type: uri_file
+  candidate_model:
+    type: uri_folder
+  training_result:
+    type: uri_file
+outputs:
+  selection:
+    type: uri_file
+code: ../../..
+environment: azureml:aml-snowflake-poc-runtime:1
+command: >-
+  PYTHONPATH=src python -m azureml_snowflake_poc.components.register_select
+  --config ${{inputs.config}}
+  --model-input ${{inputs.candidate_model}}
+  --training-result ${{inputs.training_result}}
+  --selection-output ${{outputs.selection}}

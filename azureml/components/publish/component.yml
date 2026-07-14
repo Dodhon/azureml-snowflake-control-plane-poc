@@ -1,0 +1,29 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandComponent.schema.json
+name: publish_predictions_to_snowflake
+version: 1
+display_name: Publish complete prediction batch
+type: command
+inputs:
+  config:
+    type: uri_file
+  feature_snapshot:
+    type: uri_folder
+  predictions:
+    type: uri_folder
+  scoring_result:
+    type: uri_file
+  selection:
+    type: uri_file
+outputs:
+  publish_result:
+    type: uri_file
+code: ../../..
+environment: azureml:aml-snowflake-poc-runtime:1
+command: >-
+  PYTHONPATH=src python -m azureml_snowflake_poc.components.publish
+  --config ${{inputs.config}}
+  --features-input ${{inputs.feature_snapshot}}
+  --predictions-input ${{inputs.predictions}}
+  --scoring-result ${{inputs.scoring_result}}
+  --selection ${{inputs.selection}}
+  --publish-result ${{outputs.publish_result}}

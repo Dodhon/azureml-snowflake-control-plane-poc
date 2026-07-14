@@ -1,0 +1,77 @@
+[build-system]
+requires = ["setuptools>=80", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "azureml-snowflake-control-plane-poc"
+version = "0.1.0"
+description = "Azure Machine Learning control-plane POC with Snowflake input and output boundaries"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+license = "MIT"
+authors = [{ name = "Dodhon" }]
+dependencies = [
+  "joblib==1.5.3",
+  "pandas==2.3.3",
+  "pyarrow==24.0.0",
+  "PyYAML>=6.0.2,<7",
+  "scikit-learn==1.9.0",
+]
+
+[project.optional-dependencies]
+azure = [
+  "azure-ai-ml==1.34.0",
+  "azure-eventgrid==4.22.0",
+  "azure-functions==1.24.0",
+  "azure-identity==1.25.3",
+  "azure-keyvault-secrets>=4.10,<5",
+  "azure-storage-blob>=12.27,<13",
+  "azureml-mlflow==1.62.0.post5",
+  "mlflow==3.13.0",
+]
+featurestore = [
+  "azureml-featurestore==1.2.2; platform_system != 'Darwin' or platform_machine != 'arm64'",
+]
+snowflake = [
+  "snowflake-connector-python[pandas]==4.6.0",
+  "cryptography==48.0.1",
+]
+dev = [
+  "pytest==9.1.1",
+  "ruff==0.15.21",
+]
+all = [
+  "azure-ai-ml==1.34.0",
+  "azure-eventgrid==4.22.0",
+  "azure-functions==1.24.0",
+  "azure-identity==1.25.3",
+  "azure-keyvault-secrets>=4.10,<5",
+  "azure-storage-blob>=12.27,<13",
+  "azureml-mlflow==1.62.0.post5",
+  "mlflow==3.13.0",
+  "azureml-featurestore==1.2.2; platform_system != 'Darwin' or platform_machine != 'arm64'",
+  "cryptography==48.0.1",
+  "pytest==9.1.1",
+  "ruff==0.15.21",
+]
+
+[project.scripts]
+aml-poc-demo = "azureml_snowflake_poc.demo:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
